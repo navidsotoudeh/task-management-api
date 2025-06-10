@@ -1,42 +1,40 @@
 import { Injectable } from '@nestjs/common';
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: 'pending' | 'completed';
-  priority: 'low' | 'medium' | 'high';
-  dueDate?: Date;
-}
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Task } from './entities/task.entity';
 
 @Injectable()
 export class AppService {
-  private tasks: Task[] = [];
+  constructor(
+    @InjectRepository(Task)
+    private taskRepository: Repository<Task>,
+  ) {}
 
-  getTasks(): Task[] {
-    return this.tasks;
+  async getTasks(): Promise<Task[]> {
+    return this.taskRepository.find();
   }
 
-  createTask(taskData: Omit<Task, 'id' | 'status'>): Task {
-    const task: Task = {
-      id: Date.now().toString(),
-      status: 'pending',
+  async createTask(taskData: Omit<Task, 'id' | 'status'>): Promise<Task> {
+    const task = this.taskRepository.create({
       ...taskData,
-    };
-    this.tasks.push(task);
-    return task;
+      status: 'pending',
+    });
+    return this.taskRepository.save(task);
   }
 
-  deleteTask(id: string): void {
-    this.tasks = this.tasks.filter((task) => task.id !== id);
+  async deleteTask(id: string): Promise<void> {
+    await this.taskRepository.delete(id);
   }
 
-  updateTaskStatus(id: string, status: 'pending' | 'completed'): Task {
-    const task = this.tasks.find((task) => task.id === id);
-    if (task) {
-      task.status = status;
-      return task;
+  async updateTaskStatus(
+    id: string,
+    status: 'pending' | 'completed',
+  ): Promise<Task> {
+    const task = await this.taskRepository.findOne({ where: { id } });
+    if (!task) {
+      throw new Error('Task not found');
     }
-    throw new Error('Task not found');
+    task.status = status;
+    return this.taskRepository.save(task);
   }
 }
